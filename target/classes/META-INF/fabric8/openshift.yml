@@ -1,0 +1,113 @@
+---
+apiVersion: v1
+kind: List
+items:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      prometheus.io/port: "9779"
+      prometheus.io/scrape: "true"
+    labels:
+      expose: "true"
+      provider: fabric8
+      project: test
+      version: 1.0-SNAPSHOT
+      group: com.aquila
+    name: test
+  spec:
+    ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: 8080
+    selector:
+      project: test
+      provider: fabric8
+      group: com.aquila
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    labels:
+      provider: fabric8
+      project: test
+      version: 1.0-SNAPSHOT
+      group: com.aquila
+    name: test
+  data:
+    application.properties: |
+      # spring application properties file
+      welcome = Hello from Kubernetes ConfigMap!!!
+      dummy = some value
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    annotations:
+      configmap.fabric8.io/update-on-change: test
+      fabric8.io/metrics-path: dashboard/file/kubernetes-pods.json/?var-project=test&var-version=1.0-SNAPSHOT
+    labels:
+      provider: fabric8
+      project: test
+      version: 1.0-SNAPSHOT
+      group: com.aquila
+    name: test
+  spec:
+    replicas: 1
+    selector:
+      project: test
+      provider: fabric8
+      group: com.aquila
+    strategy:
+      rollingParams:
+        timeoutSeconds: 10800
+      type: Rolling
+    template:
+      metadata:
+        annotations:
+          configmap.fabric8.io/update-on-change: test
+          fabric8.io/metrics-path: dashboard/file/kubernetes-pods.json/?var-project=test&var-version=1.0-SNAPSHOT
+        labels:
+          provider: fabric8
+          project: test
+          version: 1.0-SNAPSHOT
+          group: com.aquila
+      spec:
+        containers:
+        - env:
+          - name: KUBERNETES_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          image: aquila/test:snapshot-170329-151729-0864
+          imagePullPolicy: IfNotPresent
+          name: spring-boot
+          ports:
+          - containerPort: 8080
+            name: http
+            protocol: TCP
+          - containerPort: 9779
+            name: prometheus
+            protocol: TCP
+          - containerPort: 8778
+            name: jolokia
+            protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 180
+          securityContext:
+            privileged: false
+          volumeMounts:
+          - mountPath: /deployments/config
+            name: config
+        volumes:
+        - configMap:
+            items:
+            - key: application.properties
+              path: application.properties
+            name: test
+          name: config
+    triggers:
+    - type: ConfigChange

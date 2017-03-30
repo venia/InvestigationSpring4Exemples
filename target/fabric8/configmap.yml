@@ -1,7 +1,0 @@
-metadata:
-  name: test
-data:
-  application.properties: |
-    # spring application properties file
-    welcome = Hello from Kubernetes ConfigMap!!!
-    dummy = some value
